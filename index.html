@@ -1,10 +1,8 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>tone zone</title>
+    <title>tone zone/title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap">
     <style>
         body { margin: 0; background-color: #f8f4e3; } /* paper-like color */
@@ -12,7 +10,8 @@
     </style>
 </head>
 <body>
-   <p>this is my websitem where I will be posting vibe coded nonsense games.Have Soduku fun below.</p>
+
+    <p>this is my website where i will post vibe coded games. here is a soduku</p>
     <script type="module">
         import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.esm.js';
 
@@ -132,4 +131,165 @@
 
             graphics.lineStyle(1, color, alpha);
 
+            for (let p = -passes / 2; p <= passes / 2; p += 0.5) {
+                const offset = p * 0.3;
+                const ox = Math.cos(perpAngle) * offset;
+                const oy = Math.sin(perpAngle) * offset;
+                let currentX = x1 + ox + Phaser.Math.FloatBetween(-0.5, 0.5);
+                let currentY = y1 + oy + Phaser.Math.FloatBetween(-0.5, 0.5);
+                graphics.moveTo(currentX, currentY);
 
+                for (let s = 1; s <= segments; s++) {
+                    currentX += Math.cos(angle) * (length / segments) + Phaser.Math.FloatBetween(-0.8, 0.8);
+                    currentY += Math.sin(angle) * (length / segments) + Phaser.Math.FloatBetween(-0.8, 0.8);
+                    graphics.lineTo(currentX, currentY);
+                }
+                graphics.strokePath();
+            }
+        }
+
+        function drawPencilRect(graphics, x, y, w, h, thickness, color, alpha) {
+            drawPencilLine(graphics, x, y, x + w, y, thickness, color, alpha);
+            drawPencilLine(graphics, x + w, y, x + w, y + h, thickness, color, alpha);
+            drawPencilLine(graphics, x + w, y + h, x, y + h, thickness, color, alpha);
+            drawPencilLine(graphics, x, y + h, x, y, thickness, color, alpha);
+        }
+
+        function selectCell(row, col) {
+            selectedRow = row;
+            selectedCol = col;
+            highlightGraphics.clear();
+            drawPencilRect(highlightGraphics, col * 60, row * 60, 60, 60, 2, 0x666666, 0.4);
+        }
+
+        function addNumberText(r, c, num, isInitial = false, animate = false) {
+            if (texts[r][c]) {
+                texts[r][c].destroy();
+            }
+            texts[r][c] = null;
+            if (num === 0) return;
+
+            const weight = isInitial ? '700' : '400';
+            const color = isInitial ? '#333333' : '#666666';
+            const style = {
+                fontFamily: 'Caveat',
+                fontSize: '40px',
+                fontStyle: '',
+                color: color,
+                fontWeight: weight
+            };
+            const text = this.add.text(c * 60 + 30, r * 60 + 30, num, style);
+            text.setOrigin(0.5, 0.5);
+            text.angle = Phaser.Math.FloatBetween(-3, 3);
+            texts[r][c] = text;
+
+            if (animate) {
+                text.setScale(0.1);
+                text.setAlpha(0);
+                this.tweens.add({
+                    targets: text,
+                    scale: 1,
+                    alpha: 1,
+                    duration: 300,
+                    ease: 'Sine.easeOut'
+                });
+            }
+        }
+
+        function togglePencil(r, c, num) {
+            if (board[r][c] !== 0) return;
+            const marks = pencilMarks[r][c];
+            if (marks.has(num)) {
+                marks.delete(num);
+                if (pencilTexts[r][c][num]) {
+                    pencilTexts[r][c][num].destroy();
+                    pencilTexts[r][c][num] = null;
+                }
+            } else {
+                marks.add(num);
+                const miniCellSize = 20;
+                const px = c * 60 + (((num - 1) % 3) * miniCellSize + miniCellSize / 2);
+                const py = r * 60 + (Math.floor((num - 1) / 3) * miniCellSize + miniCellSize / 2);
+                const ptext = this.add.text(px, py, num, { fontFamily: 'Caveat', fontSize: '16px', color: '#888888' });
+                ptext.setOrigin(0.5, 0.5);
+                ptext.angle = Phaser.Math.FloatBetween(-2, 2);
+                pencilTexts[r][c][num] = ptext;
+                ptext.setScale(0.1);
+                this.tweens.add({
+                    targets: ptext,
+                    scale: 1,
+                    duration: 200,
+                    ease: 'Sine.easeOut'
+                });
+            }
+        }
+
+        function isConflict(r, c) {
+            const num = board[r][c];
+            if (num === 0) return false;
+            // Row
+            for (let j = 0; j < 9; j++) {
+                if (j !== c && board[r][j] === num) return true;
+            }
+            // Column
+            for (let i = 0; i < 9; i++) {
+                if (i !== r && board[i][c] === num) return true;
+            }
+            // Box
+            const boxRow = Math.floor(r / 3) * 3;
+            const boxCol = Math.floor(c / 3) * 3;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const ir = boxRow + i;
+                    const jc = boxCol + j;
+                    if (ir !== r || jc !== c) {
+                        if (board[ir][jc] === num) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function updateConflicts() {
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    if (texts[i][j]) {
+                        const color = isConflict(i, j) ? '#ff0000' : (initial[i][j] > 0 ? '#333333' : '#666666');
+                        texts[i][j].setColor(color);
+                    }
+                }
+            }
+        }
+
+        function checkWin() {
+            let full = true;
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    if (board[i][j] === 0) {
+                        full = false;
+                        break;
+                    }
+                }
+                if (!full) break;
+            }
+            if (!full) return;
+
+            let hasConflict = false;
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    if (isConflict(i, j)) {
+                        hasConflict = true;
+                        break;
+                    }
+                }
+                if (hasConflict) break;
+            }
+            if (!hasConflict) {
+                const winText = this.add.text(270, 270, 'Solved!', { fontFamily: 'Caveat', fontSize: '60px', color: '#00aa00' });
+                winText.setOrigin(0.5, 0.5);
+                winText.setAngle(Phaser.Math.FloatBetween(-5, 5));
+            }
+        }
+    </script>
+</body>
+</html>
