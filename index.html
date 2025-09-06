@@ -1,11 +1,135 @@
-<!DOCTYPE html> 
 
-<html>  
-   <head> 
-      <meta charset = "utf-8"> 
-      <title>tone zone</title> 
-   </head> 
-   <body> 
-     <p>this is my website, where I will be posting vibe coded nonsense games.</p>
-   </body> 
-</html> 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pencil Sudoku</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap">
+    <style>
+        body { margin: 0; background-color: #f8f4e3; } /* paper-like color */
+        canvas { display: block; margin: 0 auto; }
+    </style>
+</head>
+<body>
+   <p>this is my websitem where I will be posting vibe coded nonsense games.Have Soduku fun below.</p>
+    <script type="module">
+        import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.esm.js';
+
+        const config = {
+            type: Phaser.AUTO,
+            width: 540,
+            height: 540,
+            backgroundColor: '#f8f4e3',
+            scene: {
+                create: create,
+                update: update
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        let board = [
+            [5, 3, 0, 0, 7, 0, 0, 0, 0],
+            [6, 0, 0, 1, 9, 5, 0, 0, 0],
+            [0, 9, 8, 0, 0, 0, 0, 6, 0],
+            [8, 0, 0, 0, 6, 0, 0, 0, 3],
+            [4, 0, 0, 8, 0, 3, 0, 0, 1],
+            [7, 0, 0, 0, 2, 0, 0, 0, 6],
+            [0, 6, 0, 0, 0, 0, 2, 8, 0],
+            [0, 0, 0, 4, 1, 9, 0, 0, 5],
+            [0, 0, 0, 0, 8, 0, 0, 7, 9]
+        ];
+
+        let initial = board.map(row => row.slice());
+        let texts = Array.from({ length: 9 }, () => Array(9).fill(null));
+        let pencilMarks = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => new Set()));
+        let pencilTexts = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => Array(10).fill(null)));
+        let highlightGraphics;
+        let selectedRow, selectedCol;
+
+        function create() {
+            highlightGraphics = this.add.graphics();
+
+            // Draw grid
+            const gridGraphics = this.add.graphics();
+            for (let i = 0; i <= 9; i++) {
+                let thickness = (i % 3 === 0) ? 3 : 1;
+                drawPencilLine(gridGraphics, i * 60, 0, i * 60, 540, thickness, 0x333333, 0.6);
+                drawPencilLine(gridGraphics, 0, i * 60, 540, i * 60, thickness, 0x333333, 0.6);
+            }
+
+            // Add initial numbers
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] > 0) {
+                        addNumberText.call(this, r, c, board[r][c], true, false);
+                    }
+                }
+            }
+
+            // Input handling
+            this.input.on('pointerdown', (pointer) => {
+                let col = Math.floor(pointer.x / 60);
+                let row = Math.floor(pointer.y / 60);
+                selectCell.call(this, row, col);
+            });
+
+            this.input.keyboard.on('keydown', (event) => {
+                if (selectedRow === undefined) return;
+                let r = selectedRow;
+                let c = selectedCol;
+                if (initial[r][c] > 0) return; // Can't change initial
+
+                let key = event.key;
+                if (key >= '1' && key <= '9') {
+                    let num = parseInt(key);
+                    if (event.shiftKey) {
+                        togglePencil.call(this, r, c, num);
+                    } else {
+                        board[r][c] = num;
+                        addNumberText.call(this, r, c, num, false, true);
+                        // Clear pencil marks
+                        for (let n = 1; n <= 9; n++) {
+                            if (pencilTexts[r][c][n]) {
+                                pencilTexts[r][c][n].destroy();
+                                pencilTexts[r][c][n] = null;
+                            }
+                        }
+                        pencilMarks[r][c].clear();
+                        updateConflicts.call(this);
+                        checkWin.call(this);
+                    }
+                } else if (key === '0' || key === 'Backspace' || key === 'Delete') {
+                    if (event.shiftKey) {
+                        // Clear pencil marks
+                        for (let n = 1; n <= 9; n++) {
+                            if (pencilTexts[r][c][n]) {
+                                pencilTexts[r][c][n].destroy();
+                                pencilTexts[r][c][n] = null;
+                            }
+                        }
+                        pencilMarks[r][c].clear();
+                    } else {
+                        board[r][c] = 0;
+                        addNumberText.call(this, r, c, 0);
+                        updateConflicts.call(this);
+                    }
+                }
+            });
+        }
+
+        function update() {
+            // No update needed
+        }
+
+        function drawPencilLine(graphics, x1, y1, x2, y2, thickness = 1, color = 0x000000, alpha = 0.5) {
+            const passes = thickness * 3;
+            const angle = Phaser.Math.Angle.Between(x1, y1, x2, y2);
+            const perpAngle = angle + Math.PI / 2;
+            const length = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+            const segments = Math.max(Math.floor(length / 5), 5);
+
+            graphics.lineStyle(1, color, alpha);
+
+
